@@ -1,13 +1,23 @@
+'use client';
+
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import ProtectedRoute from '@/components/protected-route';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function PollsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { signOut } = useAuth();
+  
+  const handleLogout = async () => {
+    await signOut();
+  };
+  
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b">
@@ -35,15 +45,19 @@ export default function PollsLayout({
                 <DropdownMenuItem>
                   <Link href="/profile">Profile</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link href="/auth/login">Logout</Link>
+                <DropdownMenuItem onSelect={handleLogout}>
+                  Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <ProtectedRoute>
+          {children}
+        </ProtectedRoute>
+      </main>
       <footer className="border-t py-6">
         <div className="container flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
           <p className="text-center text-sm text-muted-foreground">
