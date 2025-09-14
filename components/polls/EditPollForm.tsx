@@ -20,7 +20,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { updatePoll } from '@/lib/actions/poll-actions';
+
 import { pollFormSchema, type PollFormValues } from '@/lib/schemas/poll-schema';
 import { Poll } from '@/lib/types';
 
@@ -82,7 +82,15 @@ export function EditPollForm({ poll }: EditPollFormProps) {
         options: filteredOptions
       };
       
-      const result = await updatePoll(pollData);
+      const response = await fetch(`/api/polls/${poll.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pollData),
+      });
+      
+      const result = await response.json();
       
       if (result.success) {
         router.push('/dashboard?updated=true');

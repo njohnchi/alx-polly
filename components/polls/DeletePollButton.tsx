@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { deletePoll } from '@/lib/actions/poll-actions';
+
 
 interface DeletePollButtonProps {
   id: string;
@@ -33,7 +33,11 @@ export function DeletePollButton({ id }: DeletePollButtonProps) {
     setError(null);
 
     try {
-      const result = await deletePoll(id);
+      const response = await fetch(`/api/polls/${id}`, {
+        method: 'DELETE',
+      });
+
+      const result = await response.json();
 
       if (result.success) {
         setOpen(false);

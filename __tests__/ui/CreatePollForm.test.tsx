@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createPoll } from '@/lib/actions/poll-actions';
+
 
 // Import mocks
 import '../mocks/ui-components';
@@ -43,10 +43,12 @@ jest.mock('@/components/polls/CreatePollForm', () => {
 
 import CreatePollForm from '@/components/polls/CreatePollForm';
 
-// Mock the createPoll function
-jest.mock('@/lib/actions/poll-actions', () => ({
-  createPoll: jest.fn(),
-}));
+// Mock fetch
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    json: () => Promise.resolve({ success: true, pollId: 'test-poll-id' }),
+  })
+) as jest.Mock;
 
 // Mock useRouter
 jest.mock('next/navigation', () => ({
@@ -58,11 +60,6 @@ jest.mock('next/navigation', () => ({
 describe('CreatePollForm Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Mock successful poll creation by default
-    (createPoll as jest.Mock).mockResolvedValue({
-      success: true,
-      pollId: 'test-poll-id',
-    });
   });
 
   test('renders the form with initial fields', () => {
@@ -96,7 +93,9 @@ describe('CreatePollForm Component', () => {
     // Submit the form
     await user.click(screen.getByRole('button', { name: /Create Poll/i }));
     
-    // Check if createPoll was called
-    expect(createPoll).toHaveBeenCalled();
+    // Check if fetch was called
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith('/api/polls', expect.any(Object));
+    });
   });
 });

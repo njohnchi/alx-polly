@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { createPoll } from '@/lib/actions/poll-actions';
+
 import { CreatePollInput } from '@/lib/types';
 
 // Validation schema for poll creation
@@ -86,7 +86,15 @@ export default function CreatePollForm() {
         options: filteredOptions
       };
       
-      const result = await createPoll(pollData);
+      const response = await fetch('/api/polls', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pollData),
+      });
+      
+      const result = await response.json();
       
       if (result.success) {
         // Show success message and redirect to polls page
