@@ -1,5 +1,5 @@
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { UpdatePollInput } from '@/lib/types';
@@ -20,9 +20,12 @@ const createServerSupabaseClient = () => {
   );
 };
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
   const supabase = createServerSupabaseClient();
-  const { id } = params;
+  const id = context.params.id;
 
   const { data: poll, error: pollError } = await supabase
     .from('polls')
@@ -40,82 +43,94 @@ export async function GET(request: Request, { params }: { params: { id: string }
   return NextResponse.json({ success: true, poll });
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
-    const supabase = createServerSupabaseClient();
-    const { id } = params;
-    const { data: { user } } = await supabase.auth.getUser();
+export async function PUT(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
+  const supabase = createServerSupabaseClient();
+  const id = context.params.id;
+  const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-        return NextResponse.json({ error: 'You must be logged in to update a poll' }, { status: 401 });
-    }
+  if (!user) {
+    return NextResponse.json({ error: 'You must be logged in to update a poll' }, { status: 401 });
+  }
 
-    const { data: existingPoll, error: pollCheckError } = await supabase
-        .from('polls')
-        .select('id, user_id')
-        .eq('id', id)
-        .single();
+  // Get the poll to check ownership
+  const { data: poll } = await supabase
+    .from('polls')
+    .select('user_id')
+    .eq('id', id)
+    .single();
 
-    if (pollCheckError || !existingPoll) {
-        return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
-    }
+  if (!poll) {
+    return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
+  }
 
-    if (existingPoll.user_id !== user.id) {
-        return NextResponse.json({ error: 'You do not have permission to update this poll' }, { status: 403 });
-    }
+  if (poll.user_id !== user.id) {
+    return NextResponse.json({ error: 'You can only update your own polls' }, { status: 403 });
+  }
 
-    const pollData: UpdatePollInput = await request.json();
+  try {
+    const body: UpdatePollInput = await request.json();
 
-    const { error: pollUpdateError } = await supabase
-        .from('polls')
-        .update({
-            title: pollData.title,
-            description: pollData.description,
-            is_multiple_choice: pollData.is_multiple_choice,
-            is_public: pollData.is_public,
-            end_date: pollData.end_date,
-        })
-        .eq('id', id);
+    // Update poll
+    const { error: updateError } = await supabase
+      .from('polls')
+      .update({
+        title: body.title,
+        description: body.description,
+        is_multiple_choice: body.is_multiple_choice,
+        is_public: body.is_public,
+        end_date: body.end_date,
+      })
+      .eq('id', id);
 
-    if (pollUpdateError) {
-        return NextResponse.json({ error: `Failed to update poll: ${pollUpdateError.message}` }, { status: 500 });
-    }
-
-    // ... (logic to update options)
-
-    return NextResponse.json({ success: true, pollId: id });
-}
-
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-    const supabase = createServerSupabaseClient();
-    const { id } = params;
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-        return NextResponse.json({ error: 'You must be logged in to delete a poll' }, { status: 401 });
-    }
-
-    const { data: existingPoll, error: pollCheckError } = await supabase
-        .from('polls')
-        .select('id, user_id')
-        .eq('id', id)
-        .single();
-
-    if (pollCheckError || !existingPoll) {
-        return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
-    }
-
-    if (existingPoll.user_id !== user.id) {
-        return NextResponse.json({ error: 'You do not have permission to delete this poll' }, { status: 403 });
-    }
-
-    const { error: deleteError } = await supabase
-        .from('polls')
-        .delete()
-        .eq('id', id);
-
-    if (deleteError) {
-        return NextResponse.json({ error: `Failed to delete poll: ${deleteError.message}` }, { status: 500 });
+    if (updateError) {
+      return NextResponse.json({ error: `Failed to update poll: ${updateError.message}` }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
+  const supabase = createServerSupabaseClient();
+  const id = context.params.id;
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'You must be logged in to delete a poll' }, { status: 401 });
+  }
+
+  // Get the poll to check ownership
+  const { data: poll } = await supabase
+    .from('polls')
+    .select('user_id')
+    .eq('id', id)
+    .single();
+
+  if (!poll) {
+    return NextResponse.json({ error: 'Poll not found' }, { status: 404 });
+  }
+
+  if (poll.user_id !== user.id) {
+    return NextResponse.json({ error: 'You can only delete your own polls' }, { status: 403 });
+  }
+
+  // Delete poll (cascade will handle options and votes)
+  const { error: deleteError } = await supabase
+    .from('polls')
+    .delete()
+    .eq('id', id);
+
+  if (deleteError) {
+    return NextResponse.json({ error: `Failed to delete poll: ${deleteError.message}` }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }
